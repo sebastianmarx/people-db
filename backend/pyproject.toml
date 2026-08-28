@@ -1,0 +1,31 @@
+[project]
+name = "people-db-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi",
+  "mangum",
+  "pydantic",
+  "PyJWT",
+  "cryptography",
+  "httpx",
+  "boto3",
+]
+
+[dependency-groups]
+dev = ["pytest", "moto[dynamodb,s3]", "ruff", "mypy", "respx"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

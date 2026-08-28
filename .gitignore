@@ -1,0 +1,26 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+backend/build/
+backend/dist/
+backend/lambda.zip
+
+# node
+node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+*.tfvars.secret
+
+# misc
+.DS_Store
+.idea/
+.vscode/
