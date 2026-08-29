@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { useConfig, useCreatePerson, useExtractText, usePerson, useUpdatePerson } from '../api/hooks'
 import type { FieldChange, PersonInput } from '../api/types'
 import { emptyPerson } from '../api/types'
 import BirthdayInput from '../components/BirthdayInput'
+import TagsInput from '../components/TagsInput'
+import { deviceContactsSupported, parseVCard, pickDeviceContact } from '../lib/contacts'
 
 function set<T extends object>(obj: T, path: string, value: unknown): T {
   const parts = path.split('.')
@@ -72,6 +74,7 @@ export default function PersonEdit() {
   const [version, setVersion] = useState<number | undefined>()
   const [paste, setPaste] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const vcardInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!existing.data) return
@@ -128,6 +131,74 @@ export default function PersonEdit() {
       {error && <p className="mx-4 mt-3 rounded-lg bg-rose-500/10 px-3 py-2 text-sm text-rose-300">{error}</p>}
 
       <div className="space-y-4 px-4 pt-4">
+        {isNew && (
+          <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
+            <p className="text-sm text-slate-300">Import from contacts</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Nothing is saved until you tap Save, and the file never leaves your phone.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {deviceContactsSupported() && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setError(null)
+                    try {
+                      const picked = await pickDeviceContact()
+                      if (picked) setForm((f) => ({ ...picked, ai_optout: f.ai_optout }))
+                    } catch {
+                      setError('Could not open your contacts.')
+                    }
+                  }}
+                  className="rounded-lg border border-slate-600 px-3 py-2 text-sm"
+                >
+                  Pick a contact
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => vcardInput.current?.click()}
+                className="rounded-lg border border-slate-600 px-3 py-2 text-sm"
+              >
+                Import a .vcf file
+              </button>
+            </div>
+            {!deviceContactsSupported() && (
+              <p className="mt-2 text-xs text-slate-600">
+                Direct contact access needs Chrome on Android. Everywhere else, open the
+                contact, share it, save the .vcf, and pick it here.
+              </p>
+            )}
+            <input
+              ref={vcardInput}
+              type="file"
+              accept=".vcf,text/vcard,text/x-vcard"
+              hidden
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                setError(null)
+                try {
+                  const [first, ...rest] = parseVCard(await file.text())
+                  if (!first) {
+                    setError('No contact found in that file.')
+                    return
+                  }
+                  setForm((f) => ({ ...first, ai_optout: f.ai_optout }))
+                  if (rest.length) {
+                    setError(
+                      `That file held ${rest.length + 1} contacts; the first one was loaded.`,
+                    )
+                  }
+                } catch {
+                  setError('That file could not be read as a contact card.')
+                }
+              }}
+            />
+          </div>
+        )}
+
         {config.data?.ai_enabled && (
           <details className="rounded-xl border border-slate-800 bg-slate-900/60 p-3">
             <summary className="cursor-pointer text-sm text-sky-400">Fill from text</summary>
@@ -240,24 +311,7 @@ export default function PersonEdit() {
         <Row label="Email" path="email" form={form} onChange={onChange} type="email" />
         <Row label="How we met" path="how_we_met" form={form} onChange={onChange} multiline />
 
-        <label className="block">
-          <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">
-            Tags (comma separated)
-          </span>
-          <input
-            value={form.tags.join(', ')}
-            onChange={(e) =>
-              onChange(
-                'tags',
-                e.target.value
-                  .split(',')
-                  .map((t) => t.trim().toLowerCase())
-                  .filter(Boolean),
-              )
-            }
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2.5 text-base outline-none focus:border-sky-500"
-          />
-        </label>
+        <TagsInput tags={form.tags} onChange={(tags) => onChange('tags', tags)} />
 
         <label className="flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-3">
           <input

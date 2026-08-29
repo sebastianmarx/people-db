@@ -58,6 +58,43 @@ export interface PersonSummary {
   tags: string[]
 }
 
+export type RelationshipType =
+  | 'spouse'
+  | 'partner'
+  | 'parent'
+  | 'child'
+  | 'sibling'
+  | 'grandparent'
+  | 'grandchild'
+  | 'friend'
+  | 'colleague'
+  | 'relative'
+  | 'other'
+
+/** Read as "<the other person> is my <label>". */
+export const RELATIONSHIP_LABELS: Record<RelationshipType, string> = {
+  spouse: 'Spouse',
+  partner: 'Partner',
+  parent: 'Parent',
+  child: 'Child',
+  sibling: 'Sibling',
+  grandparent: 'Grandparent',
+  grandchild: 'Grandchild',
+  friend: 'Friend',
+  colleague: 'Colleague',
+  relative: 'Relative',
+  other: 'Connected to',
+}
+
+export interface Relationship {
+  other_id: string
+  type: RelationshipType
+  note?: string | null
+  other_name: string
+  other_photo_url?: string | null
+  created_at: string
+}
+
 export interface Note {
   sk: string
   person_id: string

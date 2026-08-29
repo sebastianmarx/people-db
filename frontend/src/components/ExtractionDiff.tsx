@@ -21,9 +21,18 @@ export default function ExtractionDiff({ result, onApply, onDismiss, busy }: Pro
   )
 
   if (result.changes.length === 0) {
+    // Empty is a legitimate outcome, not a failure: either the note held no
+    // storable facts, or everything in it is already on the profile. Showing
+    // the model's own summary makes clear it read the note.
     return (
       <div className="rounded-xl border border-slate-700 bg-slate-800 p-4 text-sm text-slate-300">
-        <p>No new facts found in that note.</p>
+        <p className="font-medium">Nothing new to add to the profile.</p>
+        {result.summary && <p className="mt-1 text-slate-400">Read as: “{result.summary}”</p>}
+        <p className="mt-2 text-xs text-slate-500">
+          The note is saved either way. This means it held no new profile facts — details like
+          an address, job, salary, birthday or children — or that everything in it is already
+          stored.
+        </p>
         <button type="button" onClick={onDismiss} className="mt-2 text-sky-400 underline">
           Dismiss
         </button>

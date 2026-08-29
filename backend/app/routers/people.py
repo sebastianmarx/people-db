@@ -18,6 +18,8 @@ from app.models import (
     PersonInput,
     PersonPatch,
     PersonSummary,
+    Relationship,
+    RelationshipInput,
 )
 
 log = logging.getLogger(__name__)
@@ -164,3 +166,58 @@ def photo_delete(person_id: str, sub: str = Depends(require_auth)) -> Person:
     person = _load(sub, person_id)
     photos.delete(person.photo_key)
     return _with_photo(repository.set_photo_key(sub, person_id, None))
+
+
+# --------------------------------------------------------------------------
+# Relationships
+# --------------------------------------------------------------------------
+@router.get("/{person_id}/relationships", response_model=list[Relationship])
+def list_relationships(person_id: str, sub: str = Depends(require_auth)) -> list[Relationship]:
+    _load(sub, person_id)
+    # One Query for the whole address book, then an in-memory join. Cheaper
+    # and simpler than a GetItem per connection at this scale.
+    everyone = {p.id: p for p in repository.list_people(sub)}
+
+    out: list[Relationship] = []
+    for rel in repository.list_relationships(person_id):
+        other = everyone.get(rel["other_id"])
+        if other is None:
+            continue  # mirror left behind by a deleted person
+        out.append(
+            Relationship(
+                other_id=rel["other_id"],
+                type=rel["type"],
+                note=rel.get("note"),
+                other_name=other.display_name,
+                other_photo_url=photos.view_url(other.photo_key),
+                created_at=rel.get("created_at", ""),
+            )
+        )
+    out.sort(key=lambda r: (r.type, r.other_name.lower()))
+    return out
+
+
+@router.post("/{person_id}/relationships", response_model=list[Relationship], status_code=201)
+def add_relationship(
+    person_id: str, body: RelationshipInput, sub: str = Depends(require_auth)
+) -> list[Relationship]:
+    _load(sub, person_id)
+    # Both ends must be people this user owns, or the mirror would be written
+    # into a partition they have no claim on.
+    _load(sub, body.other_id)
+
+    try:
+        repository.set_relationship(person_id, body.other_id, body.type, body.note)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+
+    return list_relationships(person_id, sub)
+
+
+@router.delete("/{person_id}/relationships", response_model=list[Relationship])
+def remove_relationship(
+    person_id: str, other_id: str = Query(...), sub: str = Depends(require_auth)
+) -> list[Relationship]:
+    _load(sub, person_id)
+    repository.delete_relationship(person_id, other_id)
+    return list_relationships(person_id, sub)

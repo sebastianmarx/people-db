@@ -12,7 +12,15 @@ from botocore.exceptions import ClientError
 
 from app.config import settings
 from app.ids import new_ulid
-from app.models import Note, NoteInput, Person, PersonInput, PersonPatch, utcnow
+from app.models import (
+    RELATIONSHIP_INVERSE,
+    Note,
+    NoteInput,
+    Person,
+    PersonInput,
+    PersonPatch,
+    utcnow,
+)
 
 _dynamodb = boto3.resource("dynamodb")
 _table = _dynamodb.Table(settings.table_name)
@@ -52,6 +60,10 @@ def _person_sk(person_id: str) -> str:
 
 def _note_pk(person_id: str) -> str:
     return f"P#{person_id}"
+
+
+def _rel_sk(other_id: str) -> str:
+    return f"R#{other_id}"
 
 
 def _item_to_person(item: dict[str, Any]) -> Person:
@@ -151,8 +163,16 @@ def set_photo_key(sub: str, person_id: str, photo_key: str | None) -> Person:
 def delete_person(sub: str, person_id: str) -> None:
     get_person(sub, person_id)  # 404 rather than a silent no-op
 
+    # Each relationship is stored twice, once in each person's partition. The
+    # mirror lives under the other person, so it has to be deleted explicitly
+    # or their profile would keep pointing at someone who no longer exists.
+    mirrors = [rel["other_id"] for rel in list_relationships(person_id)]
+
     # Notes are a separate partition, so they must be removed explicitly.
     with _table.batch_writer() as batch:
+        for other_id in mirrors:
+            batch.delete_item(Key={"PK": _note_pk(other_id), "SK": _rel_sk(person_id)})
+
         kwargs: dict[str, Any] = {
             "KeyConditionExpression": Key("PK").eq(_note_pk(person_id)),
             "ProjectionExpression": "PK, SK",
@@ -221,3 +241,82 @@ def all_notes_for_search(person_ids: list[str], per_person: int = 50) -> list[No
     for pid in person_ids:
         notes.extend(list_notes(pid, limit=per_person))
     return notes
+
+
+# --------------------------------------------------------------------------
+# Relationships
+#
+# Stored as a mirrored pair: (a -> b) records what b is to a, and (b -> a)
+# records the inverse. Both are written in one transaction so a half-built
+# connection cannot exist. Reading a person's connections is then a single
+# Query against their own partition, with no scatter-gather.
+# --------------------------------------------------------------------------
+def list_relationships(person_id: str) -> list[dict[str, Any]]:
+    resp = _table.query(
+        KeyConditionExpression=Key("PK").eq(_note_pk(person_id)) & Key("SK").begins_with("R#"),
+    )
+    out = []
+    for item in resp.get("Items", []):
+        clean = _from_dynamo(item)
+        out.append(
+            {
+                "other_id": clean["other_id"],
+                "type": clean["type"],
+                "note": clean.get("note"),
+                "created_at": clean.get("created_at", ""),
+            }
+        )
+    return out
+
+
+def set_relationship(
+    person_id: str, other_id: str, rel_type: str, note: str | None = None
+) -> None:
+    if person_id == other_id:
+        raise ValueError("A person cannot be related to themselves.")
+    inverse = RELATIONSHIP_INVERSE.get(rel_type)
+    if inverse is None:
+        raise ValueError(f"Unknown relationship type: {rel_type}")
+
+    now = utcnow()
+
+    def item(owner: str, other: str, kind: str) -> dict[str, Any]:
+        entry = {
+            "PK": _note_pk(owner),
+            "SK": _rel_sk(other),
+            "entity": "relationship",
+            "person_id": owner,
+            "other_id": other,
+            "type": kind,
+            "created_at": now,
+        }
+        if note:
+            entry["note"] = note
+        return entry
+
+    table = settings.table_name
+    _dynamodb.meta.client.transact_write_items(
+        TransactItems=[
+            {"Put": {"TableName": table, "Item": item(person_id, other_id, rel_type)}},
+            {"Put": {"TableName": table, "Item": item(other_id, person_id, inverse)}},
+        ]
+    )
+
+
+def delete_relationship(person_id: str, other_id: str) -> None:
+    _dynamodb.meta.client.transact_write_items(
+        TransactItems=[
+            {
+                "Delete": {
+                    "TableName": settings.table_name,
+                    "Key": {"PK": _note_pk(person_id), "SK": _rel_sk(other_id)},
+                }
+            },
+            {
+                "Delete": {
+                    "TableName": settings.table_name,
+                    "Key": {"PK": _note_pk(other_id), "SK": _rel_sk(person_id)},
+                }
+            },
+        ]
+    )

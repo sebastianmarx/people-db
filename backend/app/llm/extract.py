@@ -28,7 +28,11 @@ ALLOWED_PATHS: dict[str, str] = {
     "job.title": "string",
     "job.company": "string",
     "job.description": "string, one or two sentences",
-    "kids": "full replacement array of {name, birth_year}",
+    "kids": (
+        "full replacement array of {name, birth_year}. Use null for either "
+        "field when it is not stated — a note saying only 'two kids' is still "
+        "worth recording as two entries with null names"
+    ),
     "phone": "string",
     "email": "string",
     "tags": "full replacement array of short lowercase strings",
@@ -49,7 +53,8 @@ Rules:
 {allowed}
 - Propose a change ONLY when the note states or clearly implies it AND the value \
 differs from the current profile. If nothing new is stated, return an empty changes array.
-- Never guess. If the note is vague about a number or a date, leave it out.
+- Never guess. If the note is vague about a number or a date, leave it out. \
+A stated count is not a guess: "two kids" means two entries.
 - "reason" must point at the words in the note that justify the change. Do not invent support.
 - For "kids" and "tags", return the complete new array, merging what you already \
 see in the current profile with what the note adds.

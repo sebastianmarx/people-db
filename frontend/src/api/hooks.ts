@@ -11,6 +11,8 @@ import type {
   Person,
   PersonInput,
   PersonSummary,
+  Relationship,
+  RelationshipType,
 } from './types'
 
 export const keys = {
@@ -18,6 +20,7 @@ export const keys = {
   person: (id: string) => ['person', id] as const,
   notes: (id: string) => ['notes', id] as const,
   config: ['config'] as const,
+  relationships: (id: string) => ['relationships', id] as const,
 }
 
 export const usePeople = () =>
@@ -154,6 +157,42 @@ export function usePhotoUpload(personId: string) {
     onSuccess: (person) => {
       qc.setQueryData(keys.person(personId), person)
       qc.invalidateQueries({ queryKey: keys.people })
+    },
+  })
+}
+
+
+export const useRelationships = (id: string | undefined) =>
+  useQuery({
+    queryKey: keys.relationships(id ?? ''),
+    queryFn: () => request<Relationship[]>(`/api/people/${id}/relationships`),
+    enabled: Boolean(id) && id !== 'new',
+  })
+
+export function useAddRelationship(personId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { other_id: string; type: RelationshipType; note?: string | null }) =>
+      request<Relationship[]>(`/api/people/${personId}/relationships`, { method: 'POST', body }),
+    onSuccess: (list, body) => {
+      qc.setQueryData(keys.relationships(personId), list)
+      // The other person's list changed too, so drop it rather than guess.
+      qc.invalidateQueries({ queryKey: keys.relationships(body.other_id) })
+    },
+  })
+}
+
+export function useRemoveRelationship(personId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (otherId: string) =>
+      request<Relationship[]>(
+        `/api/people/${personId}/relationships?other_id=${encodeURIComponent(otherId)}`,
+        { method: 'DELETE' },
+      ),
+    onSuccess: (list, otherId) => {
+      qc.setQueryData(keys.relationships(personId), list)
+      qc.invalidateQueries({ queryKey: keys.relationships(otherId) })
     },
   })
 }

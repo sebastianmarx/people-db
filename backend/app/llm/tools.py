@@ -54,7 +54,10 @@ TOOL_SPECS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "get_person",
-            "description": "Full profile plus the most recent notes for one person.",
+            "description": (
+                "Full profile, recent notes, and this person's connections to "
+                "other people (spouse, children, colleagues, and so on)."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -227,9 +230,19 @@ class ToolRunner:
 
         limit = int(args.get("note_limit") or 10)
         notes = repository.list_notes(person.id, limit=max(1, min(limit, 30)))
+
+        connections = []
+        for rel in repository.list_relationships(person.id):
+            other = self.by_id.get(rel["other_id"])
+            if other is None:
+                continue  # unknown, or opted out of AI features
+            self.referenced[other.id] = other
+            connections.append({"name": other.display_name, "is_their": rel["type"]})
+
         return json.dumps(
             {
                 "profile": person_for_llm(person),
+                "connections": connections,
                 "notes": [
                     {"date": n.occurred_on, "body": n.body} for n in notes
                 ],

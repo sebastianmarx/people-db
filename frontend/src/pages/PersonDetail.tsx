@@ -13,6 +13,7 @@ import {
 } from '../api/hooks'
 import type { ExtractionResult, FieldChange } from '../api/types'
 import Avatar from '../components/Avatar'
+import Connections from '../components/Connections'
 import ExtractionDiff from '../components/ExtractionDiff'
 import NoteComposer from '../components/NoteComposer'
 import {
@@ -167,6 +168,8 @@ export default function PersonDetail() {
             ))}
           </div>
         )}
+
+        <Connections personId={id} personName={fullName(p)} />
 
         {p.ai_optout && (
           <p className="mt-3 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-300">

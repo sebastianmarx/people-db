@@ -137,6 +137,56 @@ class PersonPatch(BaseModel):
     version: int | None = Field(default=None, description="Optimistic-locking guard.")
 
 
+# The role the OTHER person plays relative to this one, and the role this
+# person therefore plays relative to them. Stored as a mirrored pair so both
+# profiles show the connection without either being the "owner" of it.
+RELATIONSHIP_INVERSE: dict[str, str] = {
+    "spouse": "spouse",
+    "partner": "partner",
+    "parent": "child",
+    "child": "parent",
+    "sibling": "sibling",
+    "grandparent": "grandchild",
+    "grandchild": "grandparent",
+    "friend": "friend",
+    "colleague": "colleague",
+    "relative": "relative",
+    "other": "other",
+}
+
+RelationshipType = Literal[
+    "spouse",
+    "partner",
+    "parent",
+    "child",
+    "sibling",
+    "grandparent",
+    "grandchild",
+    "friend",
+    "colleague",
+    "relative",
+    "other",
+]
+
+
+class RelationshipInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    other_id: str
+    # Read as "<other person> is my <type>".
+    type: RelationshipType
+    note: str | None = Field(default=None, max_length=200)
+
+
+class Relationship(BaseModel):
+    other_id: str
+    type: RelationshipType
+    note: str | None = None
+    other_name: str = ""
+    other_photo_url: str | None = None
+    created_at: str = ""
+
+
 class NoteInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

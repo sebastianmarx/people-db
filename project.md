@@ -137,10 +137,32 @@ Table `people-db` — on-demand, PITR on, deletion protection on, encrypted at r
 | --- | --- | --- |
 | Person profile | `U#<cognito_sub>` | `P#<person_id>` |
 | Note | `P#<person_id>` | `N#<iso8601_ts>#<ulid>` |
+| Relationship | `P#<person_id>` | `R#<other_person_id>` |
 
 Listing everyone is one `Query` on `PK = U#<sub>, begins_with(SK, "P#")`. At
 personal scale (hundreds of people) that is a single page costing a fraction of a
 cent per month, so **no GSI is needed**. Search and sorting happen client-side.
+
+### Relationships
+
+A connection is stored **twice**, once in each person's partition, holding the
+role the *other* person plays: linking Mila to Alex as his child writes
+`P#alex / R#mila → "child"` and `P#mila / R#alex → "parent"`. Both go in one
+`TransactWriteItems`, so a half-built connection cannot exist.
+
+The duplication buys a lot: reading someone's connections is a single Query
+against their own partition with no scatter-gather, and both profiles show the
+link without either being its owner. The cost is that deleting a person must
+also reach into the other partitions to clear the mirrors, which
+`delete_person` does explicitly and `test_relationships.py` pins.
+
+Symmetric roles (`spouse`, `partner`, `sibling`, `friend`, `colleague`,
+`relative`) mirror themselves; `parent`/`child` and `grandparent`/`grandchild`
+invert.
+
+This sits alongside the free-text `kids` list rather than replacing it: `kids`
+records children who are not themselves people in the database, relationships
+link two records that both exist.
 
 IDs are ULIDs (`backend/app/ids.py`) rather than UUIDs, so range keys sort
 chronologically for free and notes come back newest-first with
@@ -212,6 +234,9 @@ token cookie whose `sub` matches the configured owner.
 | `POST` | `/api/people/{id}/notes?extract=true` | Add a note and optionally return a field proposal |
 | `DELETE` | `/api/people/{id}/notes?sk=…` | Delete one note |
 | `POST` | `/api/people/{id}/apply-extraction` | Persist the changes the user accepted |
+| `GET` | `/api/people/{id}/relationships` | Connections, joined to names and photos |
+| `POST` | `/api/people/{id}/relationships` | Link two people; writes the mirrored pair |
+| `DELETE` | `/api/people/{id}/relationships?other_id=…` | Unlink, both directions |
 | `POST` | `/api/people/{id}/photo-upload` | Presigned POST (2 MB cap, 120 s TTL) |
 | `POST` | `/api/people/{id}/photo` | Confirm the uploaded key, delete the previous photo |
 | `DELETE` | `/api/people/{id}/photo` | Remove the photo |
@@ -263,7 +288,7 @@ Stage 1 — the model plans, calling tools in a loop capped at 5 rounds:
 | Tool | What it does |
 | --- | --- |
 | `filter_people(field, op, value)` | Deterministic filter and **exact count** in Python. Fields include `salary_annual`, `kids_count`, `birth_month`, `city`, `company`, `tag`. |
-| `get_person(person_id, note_limit)` | Full profile plus recent notes for one person |
+| `get_person(person_id, note_limit)` | Full profile, recent notes, and that person's connections |
 | `search_notes(query, limit)` | Term-scored search across every note |
 
 Stage 2 — the model phrases an answer from the tool results. The UI renders the
@@ -489,15 +514,30 @@ description — plus contact and "how we met" when present. Empty fields render 
 a tappable `+ add` rather than disappearing, and birthdays show `turns 38 · in 12
 days`.
 
-Below it, the notes timeline, newest first, each with its conversation date.
+Below the header card, **Connections** lists linked people with their role,
+tapping through to their profile; adding one is a role dropdown plus a person
+search. Then the notes timeline, newest first, each with its conversation date.
 The composer is pinned to the bottom with **Save** and **Save + extract**; the
 extraction diff card appears above it. Tapping the avatar opens the camera or
 photo picker; the image is downscaled in-browser before upload.
 
 ### 10.3 Person edit (`/p/new`, `/p/:id/edit`)
-The full form, including a repeating children editor, a tags field, and the
-**Exclude from AI** toggle. On the new-person screen a collapsible **Fill from
-text** panel runs extraction over pasted text straight into the form.
+The full form, including a repeating children editor, chip-based tags, and the
+**Exclude from AI** toggle. Birthday is a numeric `DD.MM.YYYY` field rather than
+a native date picker, which took many taps to reach a 1980s year; the year is
+optional and a day-and-month-only entry is stored as the ISO yearless form.
+
+The new-person screen adds two ways to avoid typing:
+
+- **Import from contacts.** The Contact Picker API (`navigator.contacts`) where
+  it exists — Chrome on Android only — and a `.vcf` file import everywhere else,
+  which is the route iOS users take (open the contact, Share, save the card).
+  The file is parsed in the browser and never uploaded. The parser handles RFC
+  6350 line folding, escaped characters, `N` versus `FN`, `ADR` field order, and
+  yearless `BDAY`.
+- **Fill from text.** Runs extraction over pasted text straight into the form.
+
+Neither saves anything until Save is tapped.
 
 ### 10.4 Chat (`/chat`)
 A message thread with the input pinned at the bottom. Assistant answers list the
@@ -529,9 +569,10 @@ State so far:
 | `terraform validate` | passes |
 | `terraform fmt -check -recursive` | clean |
 | `ruff check app tests` | clean |
-| `pytest` | 11 passed |
 | `tsc -b && vite build` | passes — 93 KB gzipped |
 | Lambda package | 7.4 MB |
+| Backend tests | 20 passed |
+| vCard parser | 16 checks passed against a realistic multi-card file |
 | Live smoke test | `/api/health` 200, unauthenticated `/api/people` 401, POST without the CSRF header 403, login handshake sets HttpOnly cookies |
 
 The tests cover the parts most expensive to get wrong: optimistic locking,
@@ -570,4 +611,5 @@ First-deploy steps are in [README.md](README.md).
 | OpenCode Go changes model ids | The model is one Terraform variable; `GET /models` is the check |
 | Losing the only MFA device | Register two authenticators. Recovery path is Cognito admin access via the AWS console |
 | Concurrent edits from two tabs | `version` guard returns 409 rather than silently overwriting |
+| The model returns no JSON at all | `glm-5.3-flash` reasons before answering and reasoning is billed against `max_tokens`; too small a budget returns empty content with `finish_reason: "length"`. Thinking cannot be disabled, so requests send `reasoning_effort: "low"` with a 4000-token budget and retry once at double |
 | A 403 on `/api/*` with no Lambda logs | Almost always the OAC permission pair above, not the application. Check `aws lambda get-policy` for both statements before looking anywhere else |

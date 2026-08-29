@@ -74,6 +74,7 @@ def export(sub: str = Depends(require_auth)) -> dict:
             {
                 "person": p.model_dump(exclude={"photo_url"}),
                 "notes": [n.model_dump() for n in repository.list_notes(p.id, limit=500)],
+                "relationships": repository.list_relationships(p.id),
             }
             for p in people
         ],
