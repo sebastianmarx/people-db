@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useConfig, useCreatePerson, useExtractText, usePerson, useUpdatePerson } from '../api/hooks'
 import type { FieldChange, PersonInput } from '../api/types'
 import { emptyPerson } from '../api/types'
+import BirthdayInput from '../components/BirthdayInput'
 
 function set<T extends object>(obj: T, path: string, value: unknown): T {
   const parts = path.split('.')
@@ -29,7 +30,7 @@ interface RowProps {
   path: string
   form: PersonInput
   onChange: (path: string, value: unknown) => void
-  type?: 'text' | 'number' | 'date' | 'tel' | 'email'
+  type?: 'text' | 'number' | 'tel' | 'email'
   placeholder?: string
   multiline?: boolean
 }
@@ -170,11 +171,10 @@ export default function PersonEdit() {
           <Row label="Postcode" path="address.postal_code" form={form} onChange={onChange} />
           <Row label="City" path="address.city" form={form} onChange={onChange} />
         </div>
-        <Row label="Country" path="address.country" form={form} onChange={onChange} placeholder="DE" />
-        <Row label="Birthday" path="birthday" form={form} onChange={onChange} type="date" />
+        <BirthdayInput value={form.birthday} onChange={(iso) => onChange('birthday', iso)} />
 
         <div className="grid grid-cols-[2fr_1fr] gap-3">
-          <Row label="Salary" path="salary.amount" form={form} onChange={onChange} type="number" />
+          <Row label="Salary (€)" path="salary.amount" form={form} onChange={onChange} type="number" />
           <label className="block">
             <span className="mb-1 block text-xs uppercase tracking-wide text-slate-500">Per</span>
             <select
@@ -188,8 +188,6 @@ export default function PersonEdit() {
             </select>
           </label>
         </div>
-        <Row label="Currency" path="salary.currency" form={form} onChange={onChange} placeholder="EUR" />
-
         <Row label="Job title" path="job.title" form={form} onChange={onChange} />
         <Row label="Company" path="job.company" form={form} onChange={onChange} />
         <Row label="Job description" path="job.description" form={form} onChange={onChange} multiline />

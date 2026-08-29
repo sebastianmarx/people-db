@@ -13,7 +13,9 @@ def utcnow() -> str:
 
 
 class Address(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # `country` is accepted so records written before it was dropped still load,
+    # but it is no longer edited or displayed: everything here is Germany.
+    model_config = ConfigDict(extra="ignore")
 
     street: str | None = None
     postal_code: str | None = None
@@ -21,12 +23,14 @@ class Address(BaseModel):
     country: str | None = None
 
     def one_line(self) -> str:
-        parts = [self.street, " ".join(p for p in [self.postal_code, self.city] if p), self.country]
+        parts = [self.street, " ".join(p for p in [self.postal_code, self.city] if p)]
         return ", ".join(p for p in parts if p)
 
 
 class Salary(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # Same as Address.country: kept for older records, never edited. Everything
+    # is in euros.
+    model_config = ConfigDict(extra="ignore")
 
     amount: float | None = None
     currency: str = "EUR"

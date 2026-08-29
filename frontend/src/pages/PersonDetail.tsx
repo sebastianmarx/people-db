@@ -119,7 +119,6 @@ export default function PersonDetail() {
             ref={fileInput}
             type="file"
             accept="image/*"
-            capture="environment"
             hidden
             onChange={(e) => {
               const file = e.target.files?.[0]

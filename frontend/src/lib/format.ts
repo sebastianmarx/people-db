@@ -4,9 +4,10 @@ export function fullName(p: { given_name: string; family_name: string }): string
   return [p.given_name, p.family_name].filter(Boolean).join(' ') || '(unnamed)'
 }
 
+// Country is deliberately not shown: every address here is in Germany.
 export function formatAddress(address: Address): string {
   const line2 = [address.postal_code, address.city].filter(Boolean).join(' ')
-  return [address.street, line2, address.country].filter(Boolean).join(', ')
+  return [address.street, line2].filter(Boolean).join(', ')
 }
 
 export function formatSalary(salary: Salary): string {
@@ -14,7 +15,7 @@ export function formatSalary(salary: Salary): string {
   const period = { year: 'per year', month: 'per month', hour: 'per hour' }[salary.period]
   const amount = new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: salary.currency || 'EUR',
+    currency: 'EUR',
     maximumFractionDigits: 0,
   }).format(salary.amount)
   return `${amount} ${period}`
@@ -80,10 +81,8 @@ const PATH_LABELS: Record<string, string> = {
   'address.street': 'Street',
   'address.postal_code': 'Postal code',
   'address.city': 'City',
-  'address.country': 'Country',
   birthday: 'Birthday',
   'salary.amount': 'Salary',
-  'salary.currency': 'Currency',
   'salary.period': 'Salary period',
   'job.title': 'Job title',
   'job.company': 'Company',

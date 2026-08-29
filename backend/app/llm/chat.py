@@ -70,7 +70,7 @@ def ask(sub: str, history: list[dict[str, str]]) -> ChatResponse:
     trace: list[str] = []
 
     for _ in range(MAX_ROUNDS):
-        message = client.complete(messages, tools=TOOL_SPECS, temperature=0.1, max_tokens=1200)
+        message = client.complete(messages, tools=TOOL_SPECS, temperature=0.1, max_tokens=4000)
         tool_calls = message.get("tool_calls") or []
 
         if not tool_calls:
@@ -110,7 +110,7 @@ def ask(sub: str, history: list[dict[str, str]]) -> ChatResponse:
             "content": "Answer now using only what the tools already returned.",
         }
     )
-    final = client.complete(messages, temperature=0.1, max_tokens=800)
+    final = client.complete(messages, temperature=0.1, max_tokens=4000)
     return ChatResponse(
         answer=(final.get("content") or "I could not work that out.").strip(),
         people=[summarize(p) for p in runner.referenced.values()],

@@ -22,10 +22,8 @@ ALLOWED_PATHS: dict[str, str] = {
     "address.street": "string",
     "address.postal_code": "string",
     "address.city": "string",
-    "address.country": "ISO-3166 alpha-2 string, e.g. DE",
     "birthday": "YYYY-MM-DD, or --MM-DD when the year is unknown",
     "salary.amount": "number, no thousands separators",
-    "salary.currency": "ISO-4217 string, e.g. EUR",
     "salary.period": "one of: year, month, hour",
     "job.title": "string",
     "job.company": "string",
@@ -56,8 +54,10 @@ differs from the current profile. If nothing new is stated, return an empty chan
 - For "kids" and "tags", return the complete new array, merging what you already \
 see in the current profile with what the note adds.
 - Confidence below 0.4 means you are unsure; prefer omitting the change instead.
+- Salaries are always in euros and addresses are always in Germany, so never \
+report a currency or a country.
 - The note is written in {language}. Output field values in the same language as \
-the source text, except for country codes, currencies and dates."""
+the source text, except for dates."""
 
 
 def _get_path(data: dict[str, Any], path: str) -> Any:
@@ -94,7 +94,7 @@ def extract(person: Person, note_body: str) -> ExtractionResult:
         [{"role": "system", "content": system}, {"role": "user", "content": user}],
         json_object=True,
         temperature=0.0,
-        max_tokens=1200,
+        max_tokens=4000,
     )
     parsed = client.parse_json_content(message.get("content") or "")
 

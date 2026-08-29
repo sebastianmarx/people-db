@@ -42,32 +42,10 @@ def _api_key() -> str:
     return value
 
 
-def complete(
-    messages: list[dict[str, Any]],
-    *,
-    tools: list[dict[str, Any]] | None = None,
-    json_object: bool = False,
-    temperature: float = 0.1,
-    max_tokens: int = 2000,
-) -> dict[str, Any]:
-    """One round trip to /chat/completions. Returns the first choice's message."""
-    if not settings.ai_enabled:
-        raise LLMDisabled()
-
-    payload: dict[str, Any] = {
-        "model": settings.llm_model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    }
-    if tools:
-        payload["tools"] = tools
-        payload["tool_choice"] = "auto"
-    if json_object:
-        payload["response_format"] = {"type": "json_object"}
-
+def _post(payload: dict[str, Any]) -> tuple[dict[str, Any], str]:
+    """Single round trip. Returns (message, finish_reason)."""
     try:
-        with httpx.Client(timeout=45) as client:
+        with httpx.Client(timeout=90) as client:
             resp = client.post(
                 f"{settings.llm_base_url}/chat/completions",
                 json=payload,
@@ -86,9 +64,70 @@ def complete(
 
     body = resp.json()
     try:
-        return body["choices"][0]["message"]
+        choice = body["choices"][0]
     except (KeyError, IndexError) as exc:
         raise LLMError("Unexpected response shape from the model provider.") from exc
+
+    usage = body.get("usage", {}).get("completion_tokens_details", {})
+    log.info(
+        "llm finish=%s reasoning_tokens=%s",
+        choice.get("finish_reason"),
+        usage.get("reasoning_tokens"),
+    )
+    return choice.get("message", {}), str(choice.get("finish_reason") or "")
+
+
+def complete(
+    messages: list[dict[str, Any]],
+    *,
+    tools: list[dict[str, Any]] | None = None,
+    json_object: bool = False,
+    temperature: float = 0.1,
+    max_tokens: int = 4000,
+    reasoning_effort: str = "low",
+) -> dict[str, Any]:
+    """One round trip to /chat/completions. Returns the first choice's message.
+
+    `glm-5.3-flash` is a reasoning model and its thinking cannot be turned off —
+    the provider rejects `thinking: disabled` outright. Reasoning tokens are
+    billed against `max_tokens`, so an undersized budget is spent entirely on
+    thinking and the answer comes back with an empty `content` and
+    `finish_reason: "length"`. `reasoning_effort: "low"` cuts thinking from
+    ~1600 tokens to ~150 on the extraction prompt with no loss of quality, and
+    the budget below leaves ample room for the answer itself.
+    """
+    if not settings.ai_enabled:
+        raise LLMDisabled()
+
+    payload: dict[str, Any] = {
+        "model": settings.llm_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "reasoning_effort": reasoning_effort,
+    }
+    if tools:
+        payload["tools"] = tools
+        payload["tool_choice"] = "auto"
+    if json_object:
+        payload["response_format"] = {"type": "json_object"}
+
+    message, finish = _post(payload)
+
+    # Belt and braces: if thinking still ate the whole budget, retry once with
+    # double the room rather than failing in front of the user.
+    empty = not (message.get("content") or "").strip() and not message.get("tool_calls")
+    if empty and finish == "length":
+        log.warning("model exhausted %s tokens on reasoning; retrying larger", max_tokens)
+        payload["max_tokens"] = max_tokens * 2
+        message, finish = _post(payload)
+        if not (message.get("content") or "").strip() and not message.get("tool_calls"):
+            raise LLMError(
+                "The model spent its whole response budget thinking and returned "
+                "nothing. Try a shorter note."
+            )
+
+    return message
 
 
 def parse_json_content(content: str) -> dict[str, Any]:

@@ -58,3 +58,20 @@ def test_text_match_is_case_insensitive():
 def test_kids_count():
     p = _person(given_name="X", kids=[Kid(name="A"), Kid(name="B")])
     assert _field_value(p, "kids_count") == 2
+
+
+def test_fixed_fields_are_not_extractable():
+    """Salary is always EUR and addresses are always in Germany, so the model
+    must not be able to propose either. Guards against them creeping back in."""
+    from app.llm.extract import ALLOWED_PATHS
+
+    assert "salary.currency" not in ALLOWED_PATHS
+    assert "address.country" not in ALLOWED_PATHS
+
+
+def test_old_records_with_country_and_currency_still_load():
+    from app.models import Address, Salary
+
+    address = Address(street="Hauptstr. 5", city="Berlin", country="DE")
+    assert "DE" not in address.one_line()          # stored, never shown
+    assert Salary(amount=1000, currency="USD").currency == "USD"
