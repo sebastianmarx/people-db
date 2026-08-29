@@ -142,11 +142,25 @@ resource "aws_lambda_function_url" "api" {
 }
 
 # Only this CloudFront distribution may invoke the Function URL.
-resource "aws_lambda_permission" "cloudfront" {
-  statement_id           = "AllowCloudFrontInvoke"
+#
+# OAC needs BOTH grants. lambda:InvokeFunctionUrl alone is not enough: the
+# Function URL rejects the signed request before the function is ever reached,
+# which shows up as a bare 403 with no CloudWatch log stream at all.
+# See "Grant CloudFront permission to access the Lambda function URL" in the
+# CloudFront developer guide, which issues two add-permission calls.
+resource "aws_lambda_permission" "cloudfront_url" {
+  statement_id           = "AllowCloudFrontServicePrincipal"
   action                 = "lambda:InvokeFunctionUrl"
   function_name          = aws_lambda_function.api.function_name
   principal              = "cloudfront.amazonaws.com"
   source_arn             = aws_cloudfront_distribution.main.arn
   function_url_auth_type = "AWS_IAM"
+}
+
+resource "aws_lambda_permission" "cloudfront_invoke" {
+  statement_id  = "AllowCloudFrontServicePrincipalInvokeFunction"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.api.function_name
+  principal     = "cloudfront.amazonaws.com"
+  source_arn    = aws_cloudfront_distribution.main.arn
 }

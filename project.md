@@ -5,7 +5,7 @@
 > An LLM extracts structured fields out of the notes I write, and a chat interface
 > answers questions across the whole database.
 
-**Status:** implemented, not yet deployed
+**Status:** deployed and verified
 **Owner:** single user (private, single-tenant)
 **Live at:** https://peopledb.familiemarx.click
 **Last updated:** 2026-08-28
@@ -85,7 +85,7 @@ Three independent gates protect the app:
 2. The Lambda rejects any request without a valid, unexpired Cognito access token in an HttpOnly cookie.
 3. It further rejects any token whose `sub` is not the single configured owner, so a second pool user would still get a 403.
 
-### Two implementation details worth knowing
+### Three implementation details worth knowing
 
 **`x-amz-content-sha256`.** CloudFront's OAC signs requests to a Lambda Function
 URL but does not hash the request body. AWS therefore requires the *viewer* to
@@ -93,6 +93,14 @@ send the payload hash for `POST`/`PUT`/`PATCH`, or the origin rejects the
 signature. `frontend/src/api/client.ts` computes it with `crypto.subtle` and sends
 it on every call. The `Managed-AllViewerExceptHostHeader` origin request policy
 forwards it (and must exclude `Host`, or the signature will not match).
+
+**OAC needs two Lambda permissions, not one.** Granting only
+`lambda:InvokeFunctionUrl` to `cloudfront.amazonaws.com` is not sufficient;
+`lambda:InvokeFunction` must be granted as well. Without it every `/api/*`
+request comes back as a bare `403 Forbidden` from the Function URL and the
+function is never invoked, so **there is no CloudWatch log stream to debug from**
+— the absence of logs is the diagnostic. This cost a deploy cycle to find; see
+`infra/api.tf`.
 
 **SPA deep links.** CloudFront custom error responses are distribution-wide, so
 rewriting 403/404 to `index.html` would also corrupt legitimate 401/403 responses
@@ -524,6 +532,7 @@ State so far:
 | `pytest` | 11 passed |
 | `tsc -b && vite build` | passes — 93 KB gzipped |
 | Lambda package | 7.4 MB |
+| Live smoke test | `/api/health` 200, unauthenticated `/api/people` 401, POST without the CSRF header 403, login handshake sets HttpOnly cookies |
 
 The tests cover the parts most expensive to get wrong: optimistic locking,
 cascade delete, cross-user isolation, `Decimal` round-tripping, salary
@@ -561,3 +570,4 @@ First-deploy steps are in [README.md](README.md).
 | OpenCode Go changes model ids | The model is one Terraform variable; `GET /models` is the check |
 | Losing the only MFA device | Register two authenticators. Recovery path is Cognito admin access via the AWS console |
 | Concurrent edits from two tabs | `version` guard returns 409 rather than silently overwriting |
+| A 403 on `/api/*` with no Lambda logs | Almost always the OAC permission pair above, not the application. Check `aws lambda get-policy` for both statements before looking anywhere else |
