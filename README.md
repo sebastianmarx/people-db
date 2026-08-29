@@ -21,19 +21,15 @@ Full specification: **[project.md](project.md)**
 | Node | 22+ |
 | AWS CLI | v2, credentials for account `473197088636` |
 
-A public Route 53 hosted zone for `familiemarx.click` must already exist. It does.
+Two things must already exist, and both do:
+
+- the public Route 53 hosted zone for `familiemarx.click`
+- the shared state bucket `marx-aws-tfstates` (eu-central-1), where this project
+  keeps its state at `people-db/prod/terraform.tfstate`
 
 ## First deploy
 
 ```bash
-# 1. State bucket (once per account)
-cd infra/bootstrap && terraform init && terraform apply && cd ../..
-
-# 2. Point the backend at that bucket
-terraform -chdir=infra init \
-  -backend-config="bucket=people-db-tfstate-473197088636"
-
-# 3. Everything else
 ./scripts/deploy.sh
 ```
 

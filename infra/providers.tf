@@ -8,10 +8,11 @@ terraform {
     }
   }
 
-  # State bucket is created by infra/bootstrap. Native S3 locking (use_lockfile)
-  # means no DynamoDB lock table is needed.
+  # Central, pre-existing state bucket shared with the other projects.
+  # Native S3 locking (use_lockfile) means no DynamoDB lock table is needed.
   backend "s3" {
-    key          = "people-db/prod.tfstate"
+    bucket       = "marx-aws-tfstates"
+    key          = "people-db/prod/terraform.tfstate"
     region       = "eu-central-1"
     encrypt      = true
     use_lockfile = true
