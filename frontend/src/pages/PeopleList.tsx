@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { usePeople } from '../api/hooks'
 import Avatar from '../components/Avatar'
+import Brand from '../components/Brand'
 import { useAuth } from '../auth/AuthProvider'
 
 export default function PeopleList() {
@@ -27,7 +28,10 @@ export default function PeopleList() {
     <div className="relative h-full">
       <header className="safe-top sticky top-0 z-10 border-b border-slate-800 bg-slate-900/95 px-4 pb-3 pt-3 backdrop-blur">
         <div className="mb-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">People</h1>
+          <div className="flex items-center gap-2.5">
+            <Brand />
+            <h1 className="text-lg font-semibold">People</h1>
+          </div>
           <button
             type="button"
             onClick={() => void signOut()}

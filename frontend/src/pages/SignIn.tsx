@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { useAuth } from '../auth/AuthProvider'
+import Brand from '../components/Brand'
 
 export default function SignIn() {
   const { signIn } = useAuth()
@@ -9,8 +10,9 @@ export default function SignIn() {
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-8 text-center">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-100">people_db</h1>
+      <div className="flex flex-col items-center">
+        <Brand className="mb-5 h-20 w-20" />
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-100">people<span className="text-sky-400">_db</span></h1>
         <p className="mt-2 text-sm text-slate-400">Everything you know about the people you know.</p>
       </div>
 
