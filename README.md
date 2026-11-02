@@ -6,7 +6,7 @@ questions across everything you have stored.
 
 Full specification: **[project.md](project.md)**
 
-- **Live at** https://peopledb.familiemarx.click
+- **Live at** https://people-db.marxai.de
 - **Costs** ~$0–1.60/month on AWS, plus the $10/month OpenCode Go subscription
 - **Reachable by** exactly one Cognito user, with mandatory TOTP MFA
 
@@ -23,7 +23,7 @@ Full specification: **[project.md](project.md)**
 
 Two things must already exist, and both do:
 
-- the public Route 53 hosted zone for `familiemarx.click`
+- the public Route 53 hosted zone for `marxai.de`
 - the shared state bucket `marx-aws-tfstates` (eu-central-1), where this project
   keeps its state at `people-db/prod/terraform.tfstate`
 

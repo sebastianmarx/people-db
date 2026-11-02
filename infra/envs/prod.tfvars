@@ -1,8 +1,8 @@
 project               = "people-db"
 aws_region            = "eu-central-1"
 owner_email           = "sebastian.sm.marx@gmail.com"
-domain_name           = "peopledb.familiemarx.click"
-route53_zone_name     = "familiemarx.click"
+domain_name           = "people-db.marxai.de"
+route53_zone_name     = "marxai.de"
 cognito_domain_prefix = "peopledb-marx"
 
 llm_base_url  = "https://opencode.ai/zen/go/v1"

@@ -7,7 +7,7 @@
 
 **Status:** deployed and verified
 **Owner:** single user (private, single-tenant)
-**Live at:** https://peopledb.familiemarx.click
+**Live at:** https://people-db.marxai.de
 **Last updated:** 2026-08-28
 
 ---
@@ -31,7 +31,7 @@
 ### Settled decisions
 | Question | Answer |
 | --- | --- |
-| Custom domain | Yes — `peopledb.familiemarx.click`. The `familiemarx.click` hosted zone already exists (`Z05833773RFS0PY53IOJZ`), so there is no extra Route 53 charge. |
+| Custom domain | Yes — `people-db.marxai.de`. The `marxai.de` hosted zone already exists (`Z079978511H41VTS0SPET`), so there is no extra Route 53 charge. |
 | Birthday reminders | Not now. Kept in the backlog (§12). |
 | Chat history | Ephemeral. The transcript lives in the browser tab and is replayed to the API; nothing is stored server-side. |
 | UI and note language | English. `note_language = "en"` steers the extraction prompt. |
@@ -59,7 +59,7 @@
 ```
                      ┌──────────────────────────────┐
   Phone browser ──►  │  CloudFront distribution     │
-   (HTTPS)           │  peopledb.familiemarx.click  │
+   (HTTPS)           │  people-db.marxai.de  │
                      └──────┬────────────────┬──────┘
                             │                │
                 default     │                │  /api/*

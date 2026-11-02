@@ -18,13 +18,13 @@ variable "owner_email" {
 variable "domain_name" {
   description = "Fully qualified domain the app is served from."
   type        = string
-  default     = "peopledb.familiemarx.click"
+  default     = "people-db.marxai.de"
 }
 
 variable "route53_zone_name" {
   description = "Existing public hosted zone that contains domain_name. Trailing dot optional."
   type        = string
-  default     = "familiemarx.click"
+  default     = "marxai.de"
 }
 
 variable "cognito_domain_prefix" {
